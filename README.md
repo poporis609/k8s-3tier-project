@@ -1,3 +1,4 @@
+echo "# k8s-3tier-project"
 echo "before start command ./setup-improved.sh"
 echo "you should check first NFS directory mkdir /shared/ssd , mkdir /shared/hdd"
 echo "also command chmod 777 -R /shared"
