@@ -1,0 +1,294 @@
+# Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hdd-db-sec
+  namespace: hdd-tier
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "test123"
+  MYSQL_USER: "tomuser"
+  MYSQL_PASSWORD: "test123"
+  MYSQL_DATABASE: "tomdb"
+---
+# Database Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdd-db-svc
+  namespace: hdd-tier
+spec:
+  selector:
+    app: hdd-db
+  ports:
+  - port: 3306
+  clusterIP: None
+---
+# Database StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hdd-db
+  namespace: hdd-tier
+spec:
+  serviceName: hdd-db-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hdd-db
+  template:
+    metadata:
+      labels:
+        app: hdd-db
+        tier: database
+    spec:
+      nodeSelector:
+        disk-type: hdd
+      tolerations:
+      - key: storage
+        operator: Equal
+        value: hdd
+        effect: NoSchedule
+      containers:
+      - name: mysql
+        image: mysql:5.7
+        envFrom:
+        - secretRef:
+            name: hdd-db-sec
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 600m
+            memory: 1Gi
+        readinessProbe:
+          exec:
+            command: ["mysqladmin", "ping", "-h", "localhost"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      - name: cpu-load
+        image: busybox
+        command: ["/bin/sh","-c"]
+        args: ["while true; do dd if=/dev/zero of=/dev/null bs=1M count=100 2>/dev/null; sleep 2; done"]
+        resources:
+          limits:
+            cpu: 400m
+            memory: 128Mi
+---
+# Application PV
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hdd-tom-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: nfs-storage
+  nfs:
+    path: /shared/hdd
+    server: SERVER_IP
+---
+# Application PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hdd-tom-pvc
+  namespace: hdd-tier
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-storage
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Application ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hdd-tom-configmap
+  namespace: hdd-tier
+data:
+  index.jsp: |
+    <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+    <%@ page import="java.sql.*"%>
+    <html>
+    <head><title>HDD Tier</title></head>
+    <body style="font-family:Arial;padding:20px;">
+    <h1 style="color:#FF5722;">🐌 HDD Tier - Standard Storage</h1>
+    <%
+    Connection conn=null;
+    try{
+        String Url="jdbc:mysql://hdd-db-svc/tomdb";
+        String Id="tomuser";
+        String Pass="test123";
+        Class.forName("com.mysql.cj.jdbc.Driver");
+        conn=DriverManager.getConnection(Url,Id,Pass);
+        out.println("<p style='color:green;font-size:18px;'>✅ WAS-DB Connection Success!</p>");
+        out.println("<p><b>Storage:</b> HDD (Standard)</p>");
+        out.println("<p><b>CPU Limit:</b> 50%</p>");
+    }catch(Exception e){
+        out.println("<p style='color:red;'>❌ Failed: "+e.getMessage()+"</p>");
+    }finally{
+        if(conn!=null) conn.close();
+    }
+    %>
+    </body>
+    </html>
+---
+# Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdd-tom-svc
+  namespace: hdd-tier
+spec:
+  selector:
+    app: hdd-tom
+  ports:
+  - port: 8080
+---
+# Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hdd-tom
+  namespace: hdd-tier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hdd-tom
+  template:
+    metadata:
+      labels:
+        app: hdd-tom
+        tier: application
+    spec:
+      nodeSelector:
+        disk-type: hdd
+      tolerations:
+      - key: storage
+        operator: Equal
+        value: hdd
+        effect: NoSchedule
+      containers:
+      - name: tomcat
+        image: tomcat:9.0
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 150m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: index
+          mountPath: /usr/local/tomcat/webapps/ROOT/index.jsp
+          subPath: index.jsp
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      - name: cpu-load
+        image: busybox
+        command: ["/bin/sh","-c"]
+        args: ["while true; do dd if=/dev/zero of=/dev/null bs=512K count=50 2>/dev/null; sleep 3; done"]
+        resources:
+          limits:
+            cpu: 300m
+            memory: 64Mi
+      volumes:
+      - name: index
+        configMap:
+          name: hdd-tom-configmap
+---
+# Web ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hdd-nginx-configmap
+  namespace: hdd-tier
+data:
+  default.conf: |
+    server {
+      listen 80;
+      location / {
+          proxy_pass http://hdd-tom-svc:8080/;
+          proxy_set_header Host $host;
+      }
+    }
+---
+# Web Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hdd-nginx-svc
+  namespace: hdd-tier
+spec:
+  type: LoadBalancer
+  selector:
+    app: hdd-nginx
+  ports:
+  - port: 80
+---
+# Web Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hdd-nginx
+  namespace: hdd-tier
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hdd-nginx
+  template:
+    metadata:
+      labels:
+        app: hdd-nginx
+        tier: web
+    spec:
+      nodeSelector:
+        disk-type: hdd
+      tolerations:
+      - key: storage
+        operator: Equal
+        value: hdd
+        effect: NoSchedule
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 20m
+            memory: 128Mi
+          limits:
+            cpu: 40m
+            memory: 256Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 3
+      volumes:
+      - name: config
+        configMap:
+          name: hdd-nginx-configmap

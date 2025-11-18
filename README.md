@@ -1,0 +1,6 @@
+echo "before start command ./setup-improved.sh"
+echo "you should check first NFS directory mkdir /shared/ssd , mkdir /shared/hdd"
+echo "also command chmod 777 -R /shared"
+echo "vi /etc/exports"
+echo "/shared *(rw,sync,no_subtree_check,no_root_squash)"
+echo "Then run the command: chmod +x *.sh, and start the setup with: ./setup-improved.sh"

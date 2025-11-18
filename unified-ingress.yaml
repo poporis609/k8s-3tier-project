@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ssd-ingress
+  namespace: ssd-tier
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ilove.k8s.com
+      http:
+        paths:
+          - path: /ssd(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ssd-nginx-svc
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hdd-ingress
+  namespace: hdd-tier
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ilove.k8s.com
+      http:
+        paths:
+          - path: /hdd(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: hdd-nginx-svc
+                port:
+                  number: 80
