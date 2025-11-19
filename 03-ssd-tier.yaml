@@ -172,7 +172,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: tomcat
-        image: 61.254.18.30:5000/tomcat
+        image: tomcat:9.0
         ports:
         - containerPort: 8080
         resources:
