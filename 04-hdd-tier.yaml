@@ -180,7 +180,7 @@ spec:
         effect: NoSchedule
       containers:
       - name: tomcat
-        image: tomcat:9.0
+        image: 61.254.18.30:5000/tomcat
         ports:
         - containerPort: 8080
         resources:
@@ -194,6 +194,9 @@ spec:
         - name: index
           mountPath: /usr/local/tomcat/webapps/ROOT/index.jsp
           subPath: index.jsp
+        - name: hdd-lib-vol
+          mountPath: /usr/local/tomcat/lib/mysql-connector-java-8.0.23.jar
+          subPath: mysql-connector-java-8.0.23.jar
         readinessProbe:
           httpGet:
             path: /
@@ -212,6 +215,12 @@ spec:
       - name: index
         configMap:
           name: hdd-tom-configmap
+          items:
+          - key: index.jsp
+            path: index.jsp
+      - name: hdd-lib-vol
+        persistentVolumeClaim:
+          claimName: hdd-tom-pvc
 ---
 # Web ConfigMap
 apiVersion: v1
