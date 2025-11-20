@@ -145,5 +145,5 @@ else
     echo "  kubectl get svc -n ingress-nginx  # External IP 확인"
     echo "  echo '<EXTERNAL_IP> ilove.k8s.com' | sudo tee -a /etc/hosts"
 fi
-echo "  kubectl apply -f 07-hpa.yaml  # HPA 활성화"
+echo "  kubectl apply -f 06-hpa.yaml  # HPA 활성화"
 echo "  ./test.sh                     # 부하 테스트"
