@@ -34,7 +34,7 @@ echo ""
 read -p "HPA를 활성화하시겠습니까? (y/n): " enable_hpa
 if [[ $enable_hpa == "y" ]]; then
     print_info "HPA 활성화 중..."
-    kubectl apply -f 07-hpa.yaml
+    kubectl apply -f 06-hpa.yaml
     sleep 10
     print_success "HPA 활성화 완료"
 fi
